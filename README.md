@@ -1,4 +1,5 @@
 # Mumford-Shah  
 Digital Image Processing  
 
-This algorrithm
+This algorithm makes use of the Mumford-Shah functional to  
+make image segmentation and object detection.

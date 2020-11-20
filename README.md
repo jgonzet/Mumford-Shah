@@ -1,2 +1,4 @@
-# Mumford-Shah
-Digital Image Processing
+# Mumford-Shah  
+Digital Image Processing  
+
+This algorrithm

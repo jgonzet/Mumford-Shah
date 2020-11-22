@@ -10,11 +10,11 @@ dim = size(image1);
 regions = defaultRegions(dim);
 numRegions = max(unique(regions));
 
-for r=0:numRegions       
-    regions=mergeRegions(r, regions, image1, nu);
+for r = 0:numRegions       
+    regions = mergeRegions(r, regions, image1, nu);
 end
 
-%regions=consolidateRegions(regions); % no se usa esta función
+%regions = consolidateRegions(regions); % no se usa esta función
 
 img = double(image1);
 f = getF(regions, image1);

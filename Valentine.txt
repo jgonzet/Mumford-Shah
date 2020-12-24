@@ -1,0 +1,248 @@
+%Appendix A: Algorithm Implimentation
+% Algorithm Implementation for MATH648 Project
+% Written by Russell Valentine
+%===============================================================================
+
+
+% Example Usage:
+% nu=10;
+% filename="myimage";
+% more off;
+% [image1, regions]=segmentPNG([filename,".png"], nu, 1);
+% img=double(image1);
+% f=getF(regions, image1);
+% b=getBorder(regions)*255;
+% saveimage([filename,"-region-",int2str(nu),".img"], regions, "img");
+% pngwrite([filename,"-grayG-",int2str(nu),".png"], img,img,img,
+% ones(size(img))*255);
+% pngwrite([filename,"-f-",int2str(nu),".png"], f,f,f,
+% ones(size(f))*255);
+% pngwrite([filename,"-border-",int2str(nu),".png"], b, b, b,
+% ones(size(b))*255);
+
+
+%makeGray: pasa la imagen a escala de grises
+
+function img=makeGray(image1)
+  img=(0.3*image1(:,:,1)+0.59*image1(:,:,2)+0.11*image1(:,:,3));
+endfunction
+
+%regionArea: devuelve el area de una region
+
+function area=regionArea(regionNumber, regions)
+  dim=size(regions);
+  area=sum(sum(regions==regionNumber));
+endfunction
+
+%sumG: suma los pixeles en una region
+
+function sG=sumG(regionNumber, regions, image1)
+  sG=sum(sum(image1(regions==regionNumber)));
+endfunction
+
+
+%regionBorderLength: calcula el largo del contorno de una region
+
+function length1=regionBorderLength(regionNumber, regions)
+  dim=size(regions);
+  length1=0;
+  for x=1:dim(1)
+    for y=1:dim(2)
+      if(regions(x,y)==regionNumber)
+        if((x>1) && (regions(x-1,y) != regionNumber))
+          length1++;
+        endif
+        if((x<dim(1)) && (regions(x+1,y) != regionNumber))
+          length1++;
+        endif
+        if((y>1) && (regions(x,y-1) != regionNumber))
+          length1++;
+        endif
+        if((y<dim(2)) && (regions(x,y+1) != regionNumber))
+          length1++;
+        endif
+      endif
+    endfor
+  endfor
+endfunction
+
+
+%defaultRegions:hace la particion maxima : cada pixel es una region
+
+function regions=defaultRegions(dim)
+  regions=zeros(dim);
+  count=0;
+  for x=1:dim(1)
+    for y=1:dim(2)
+      regions(x,y)=count;
+      count++;
+    endfor
+  endfor
+endfunction
+
+
+%deltaE: calcula DeltaE en una región y actualiza sus parámetros
+
+function [dE,area1,sumg1,f1,borderLength1,regions]=deltaE(regions,regionNum1,regionNum2,image1,nu,region1Stuff)
+  area1=region1Stuff(1);
+  sumg1=region1Stuff(2);
+  f1=region1Stuff(3);
+  borderLength1=region1Stuff(4);
+
+  area2=regionArea(regionNum2, regions);
+  sumg2=sumG(regionNum2, regions, image1);
+  f2=sumg2/area2;
+  oldlb2=regionBorderLength(regionNum2, regions);
+  newRegions=regions;
+  newRegions(newRegions==regionNum2)=regionNum1;
+  newlb=regionBorderLength(regionNum1, newRegions);
+  L=borderLength1+oldlb2-newlb;
+  normfs=abs(f1-f2);
+  dE=((area1*area2)/(area1+area2))*normfs-nu*L;
+  if(dE<0)
+    area1=area1+area2;
+    sumg1=sumg1+sumg2;
+    f1=sumg1/area1;
+    borderLength1=newlb;
+    regions=newRegions;
+    endif
+endfunction
+
+
+%mergeRegions:recorre y chequea si una region se deberia fusionar con una vecina
+
+function regions=mergeRegions(regionNumber, regions, image1, nu)
+  if(sum(sum(regions==regionNumber))>0)
+    dim=size(image1);
+
+    %Reset already tried if a region was added
+    regionAdded=1;
+    area1=regionArea(regionNumber, regions);
+    sumg1=sumG(regionNumber, regions, image1);
+    f1=sumg1/area1;
+    borderLength1=regionBorderLength(regionNumber, regions);
+    while(regionAdded)
+      alreadyTried=[];
+      regionAdded=0;
+      for x=1:dim(1)
+        for y=1:dim(2)
+          if(regions(x,y)==regionNumber)
+            if((x>1)&& (regions(x-1,y)!=regionNumber)&&(sum(alreadyTried==regions(x-1,y))==0))
+              regionNum2=regions(x-1,y);
+              [dE, area1, sumg1, f1, borderLength1, regions]=deltaE(regions,regionNumber, regionNum2, image1, nu,[area1, sumg1, f1, borderLength1]);
+              if(dE<0)
+                alreadyTried=[];
+                regionAdded=1;
+              else
+                alreadyTried=[alreadyTried,regionNum2];
+              endif
+            endif
+            if((x<dim(1)) && (regions(x+1,y)!=regionNumber)&&(sum(alreadyTried==regions(x+1,y))==0))
+              regionNum2=regions(x+1,y);
+              [dE, area1, sumg1, f1, borderLength1, regions]=deltaE(regions,regionNumber, regionNum2, image1, nu,[area1, sumg1, f1, borderLength1]);
+              if(dE<0)
+                alreadyTried=[];
+                regionAdded=1;
+              else
+                alreadyTried=[alreadyTried,regionNum2];
+              endif
+            endif
+            if((y>1) && (regions(x,y-1)!=regionNumber)&&(sum(alreadyTried==regions(x,y-1))==0))
+              regionNum2=regions(x,y-1);
+              [dE, area1, sumg1, f1, borderLength1, regions]=deltaE(regions,regionNumber, regionNum2, image1, nu,[area1, sumg1, f1, borderLength1]);
+              if(dE<0)
+                alreadyTried=[];
+                regionAdded=1;
+              else
+                alreadyTried=[alreadyTried,regionNum2];
+              endif
+            endif
+            if((y<dim(2)) && (regions(x,y+1)!=regionNumber)&&(sum(alreadyTried==regions(x,y+1))==0))
+              regionNum2=regions(x,y+1);
+              [dE, area1, sumg1, f1, borderLength1, regions]=deltaE(regions,regionNumber, regionNum2, image1, nu,[area1, sumg1, f1, borderLength1]);
+              if(dE<0)
+                alreadyTried=[];
+                regionAdded=1;
+              else
+                alreadyTried=[alreadyTried,regionNum2];
+             endif
+           endif
+          endif
+       endfor
+      endfor
+    endwhile
+  endif
+endfunction
+
+
+% consolidateRegions: reenumera las regiones
+
+function regions=consolidateRegions(regions)
+  ur=sort(unique(regions)).’;
+  count=0;
+  for i=ur
+    if(i != count)
+      regions(regions==i)=count;
+    endif
+    count++;
+  endfor
+endfunction
+
+
+% getF:devuelve f, la aproximacion de g
+
+function f=getF(regions, image1)
+  f=zeros(size(image1));
+  for r=sort(unique(regions)).’
+    f(regions==r)=sumG(r, regions, image1)/regionArea(r, regions);
+  endfor
+endfunction
+
+
+% getBorder:devuelve una matriz con los bordes de la imagen
+
+function border=getBorder(regions)
+  border=ones(size(regions));
+  dim=size(regions);
+  for regionNumber=sort(unique(regions)).’
+    for x=1:dim(1);
+      for y=1:dim(2);
+        if(regions(x,y)==regionNumber)
+          if((x>1) && (regions(x-1,y) > regionNumber))
+            border(x,y)=0;
+          endif
+          if((x<dim(1)) && (regions(x+1,y) > regionNumber))
+            border(x,y)=0;
+          endif
+          if((y>1) && (regions(x,y-1) > regionNumber))
+            border(x,y)=0;
+          endif
+          if((y<dim(2)) && (regions(x,y+1) > regionNumber))
+            border(x,y)=0;
+          endif
+        endif
+      endfor
+    endfor
+  endfor
+endfunction
+
+
+%segmentPNG:
+
+function [image1, regions]=segmentPNG(file, nu, statusOutput)
+  image1=pngread(file);
+  image1=makeGray(image1);
+  regions=defaultRegions(size(image1));
+  numRegions=max(unique(regions));
+  for r=0:numRegions
+    regions=mergeRegions(r, regions, image1, nu);
+    if(statusOutput > 0)
+      printf("%d%% Complete\n", (r/numRegions)*100)
+    endif
+  endfor
+  if(statusOutput > 0)
+    printf("Consolidating Regions...\n")
+  endif
+  regions=consolidateRegions(regions);
+endfunction
+
